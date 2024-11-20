@@ -4,261 +4,423 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Decima Sender</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         [v-cloak] {
             display: none;
         }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #f3f4f6;
+            overflow-x: hidden;
+        }
+        #app {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+        .app-container {
+            width: 100%;
+            max-width: 800px;
+            background-color: white;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            padding: 2rem;
+            margin: 0 auto;
+        }
+        .log-container {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #f9fafb;
+        }
+        .log-entry {
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+        }
+        .log-info { background-color: #e1effe; color: #1e40af; }
+        .log-success { background-color: #dcfce7; color: #166534; }
+        .log-error { background-color: #fee2e2; color: #991b1b; }
+        @media (max-width: 768px) {
+            #app {
+                padding: 1rem;
+            }
+            .app-container {
+                padding: 1rem;
+            }
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <div id="app" class="container mx-auto px-4 py-8 max-w-2xl" v-cloak>
-        <div class="bg-white rounded-lg shadow-lg p-6">
-            <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">Decima Sender</h1>
+<body>
+    <div id="app" v-cloak>
+        <div class="app-container">
+            <h1 class="text-3xl font-bold text-center mb-8">Decima Sender</h1>
             
-            <!-- Email List Management -->
-            <div class="mb-8 p-4 bg-gray-50 rounded-lg">
-                <h2 class="text-xl font-semibold mb-4">Email Lists</h2>
-                
-                <!-- Create/Edit List Form -->
-                <div class="space-y-4 mb-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">List Name</label>
-                        <input type="text" v-model="newListName" placeholder="Enter list name"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            <!-- Main Content -->
+            <div class="space-y-8">
+                <!-- Email Credentials -->
+                <div class="space-y-4">
+                    <h2 class="text-xl font-semibold mb-4">Gmail Credentials</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Gmail Address</label>
+                            <input type="email" v-model="gmail" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">App Password</label>
+                            <input type="password" v-model="appPassword" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <div class="mt-1">
+                                <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener"
+                                    class="text-sm text-blue-600 hover:text-blue-800">
+                                    Get an App Password from Google
+                                </a>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" v-model="saveCredentials" id="saveCredentials"
+                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="saveCredentials" class="ml-2 block text-sm text-gray-900">
+                                Save credentials for next time
+                            </label>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Emails (one per line)</label>
-                        <textarea v-model="newListEmails" rows="3" placeholder="Enter emails, one per line"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
-                    </div>
-                    <button @click="saveEmailList" :disabled="!newListName"
-                        class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50">
-                        Save List
-                    </button>
                 </div>
 
-                <!-- Existing Lists -->
-                <div v-if="Object.keys(emailLists).length > 0" class="space-y-4">
-                    <h3 class="text-lg font-medium">Your Lists</h3>
-                    <div v-for="(emails, name) in emailLists" :key="name" 
-                        class="p-3 bg-white rounded border border-gray-200 flex justify-between items-center">
-                        <div>
-                            <span class="font-medium">{{ name }}</span>
-                            <span class="text-gray-500 text-sm ml-2">({{ emails.length }} emails)</span>
+                <!-- Email Lists -->
+                <div class="space-y-4">
+                    <h2 class="text-xl font-semibold mb-4">Email Lists</h2>
+                    <div class="space-y-4">
+                        <!-- Create New List -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-medium">Create New List</h3>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">List Name</label>
+                                <input type="text" v-model="newListName" required
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Emails (one per line)</label>
+                                <textarea v-model="newListEmails" rows="4" required
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                            </div>
+                            <button @click="saveEmailList"
+                                class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                Save List
+                            </button>
                         </div>
-                        <div class="space-x-2">
-                            <button @click="editList(name)" 
-                                class="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded">
-                                Edit
-                            </button>
-                            <button @click="deleteList(name)"
-                                class="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded">
-                                Delete
-                            </button>
+
+                        <!-- Existing Lists -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-medium">Existing Lists</h3>
+                            <div v-for="(emails, name) in emailLists" :key="name" class="p-4 bg-gray-50 rounded-md">
+                                <div class="flex justify-between items-center">
+                                    <h4 class="font-medium">{{ name }}</h4>
+                                    <button @click="deleteEmailList(name)"
+                                        class="text-red-600 hover:text-red-800 focus:outline-none">
+                                        Delete
+                                    </button>
+                                </div>
+                                <p class="text-sm text-gray-600 mt-1">{{ emails.length }} emails</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Send Emails -->
+                <div class="space-y-4">
+                    <h2 class="text-xl font-semibold mb-4">Send Emails</h2>
+                    <form @submit.prevent="sendEmails" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Select Email List</label>
+                            <select v-model="selectedList"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">Select a list...</option>
+                                <option v-for="(_, name) in emailLists" :key="name" :value="name">
+                                    {{ name }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Or Enter Emails Directly (one per line)</label>
+                            <textarea v-model="emails" rows="4"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Subject</label>
+                            <input type="text" v-model="subject" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Message</label>
+                            <textarea v-model="message" rows="4" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Attachments</label>
+                            <input type="file" multiple @change="handleFileUpload" ref="fileInput"
+                                class="mt-1 block w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-md file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-blue-50 file:text-blue-700
+                                hover:file:bg-blue-100">
+                        </div>
+
+                        <button type="submit" :disabled="loading"
+                            class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span v-if="loading">Sending...</span>
+                            <span v-else>Send Emails</span>
+                        </button>
+                    </form>
+
+                    <!-- Logging Section -->
+                    <div v-if="logs.length > 0" class="mt-6">
+                        <h3 class="text-lg font-medium mb-2">Progress Log</h3>
+                        <div class="bg-gray-50 rounded-md p-4 h-48 overflow-y-auto space-y-2">
+                            <div v-for="(log, index) in logs" :key="index" 
+                                class="text-sm" 
+                                :class="{
+                                    'text-gray-600': log.type === 'info',
+                                    'text-green-600': log.type === 'success',
+                                    'text-red-600': log.type === 'error'
+                                }">
+                                <span class="font-medium">[{{ log.timestamp }}]</span> {{ log.message }}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Email Form -->
-            <form @submit.prevent="sendEmails" class="space-y-6">
-                <!-- Gmail Credentials -->
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Gmail Address</label>
-                        <input type="email" v-model="gmail" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">App Password</label>
-                        <input type="password" v-model="appPassword" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                    </div>
+            <!-- Status Messages and Logs -->
+            <div class="mt-8 space-y-4">
+                <h2 class="text-xl font-semibold">Status and Logs</h2>
+                <!-- Status Message -->
+                <div v-if="status" class="p-4 rounded-md" :class="{
+                    'bg-green-50 text-green-800': status.type === 'success',
+                    'bg-red-50 text-red-800': status.type === 'error',
+                    'bg-blue-50 text-blue-800': status.type === 'info'
+                }">
+                    {{ status.message }}
                 </div>
-
-                <!-- Recipients -->
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Select Email List (Optional)</label>
-                        <select v-model="selectedList"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            <option value="">Enter emails manually</option>
-                            <option v-for="(emails, name) in emailLists" :key="name" :value="name">
-                                {{ name }} ({{ emails.length }} emails)
-                            </option>
-                        </select>
-                    </div>
-                    <div v-if="!selectedList">
-                        <label class="block text-sm font-medium text-gray-700">Recipients (comma-separated)</label>
-                        <input type="text" v-model="emails" :required="!selectedList"
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                
+                <!-- Log Container -->
+                <div class="log-container">
+                    <div v-for="(log, index) in logs" :key="index" 
+                         class="log-entry" 
+                         :class="{
+                            'log-info': log.type === 'info',
+                            'log-success': log.type === 'success',
+                            'log-error': log.type === 'error'
+                         }">
+                        {{ log.message }}
                     </div>
                 </div>
-
-                <!-- Subject -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Subject</label>
-                    <input type="text" v-model="subject" required
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                </div>
-
-                <!-- Message -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Message</label>
-                    <textarea v-model="message" rows="4" required
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
-                </div>
-
-                <!-- File Upload -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Attachment</label>
-                    <input type="file" ref="fileInput" required
-                        class="mt-1 block w-full text-sm text-gray-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-md file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-blue-50 file:text-blue-700
-                        hover:file:bg-blue-100">
-                </div>
-
-                <!-- Submit Button -->
-                <button type="submit" :disabled="loading"
-                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
-                    {{ loading ? 'Sending...' : 'Send Emails' }}
-                </button>
-            </form>
-
-            <!-- Status Messages -->
-            <div v-if="status" :class="['mt-4 p-4 rounded-md', 
-                status.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700']">
-                {{ status.message }}
             </div>
         </div>
-    </div>
 
-    <script>
-        const { createApp } = Vue
+        <script>
+            const { createApp } = Vue
 
-        createApp({
-            data() {
-                return {
-                    gmail: '',
-                    appPassword: '',
-                    emails: '',
-                    subject: '',
-                    message: '',
-                    loading: false,
-                    status: null,
-                    // Email list management
-                    emailLists: {},
-                    newListName: '',
-                    newListEmails: '',
-                    selectedList: ''
-                }
-            },
-            mounted() {
-                this.loadEmailLists()
-            },
-            methods: {
-                async loadEmailLists() {
-                    try {
-                        const response = await axios.get('/api/email-lists')
-                        this.emailLists = response.data
-                    } catch (error) {
-                        console.error('Error loading email lists:', error)
+            createApp({
+                data() {
+                    return {
+                        gmail: '',
+                        appPassword: '',
+                        saveCredentials: false,
+                        selectedList: '',
+                        emailLists: {},
+                        newListName: '',
+                        newListEmails: '',
+                        status: null,
+                        logs: [],
+                        sending: false
                     }
                 },
-                async saveEmailList() {
-                    try {
-                        const emails = this.newListEmails.split('\n')
-                            .map(email => email.trim())
-                            .filter(email => email)
-                        
-                        await axios.post('/api/email-lists', {
-                            name: this.newListName,
-                            emails: emails
-                        })
-                        
-                        // Reset form and reload lists
-                        this.newListName = ''
-                        this.newListEmails = ''
-                        await this.loadEmailLists()
-                        
-                        this.status = {
-                            type: 'success',
-                            message: 'Email list saved successfully!'
-                        }
-                    } catch (error) {
-                        this.status = {
-                            type: 'error',
-                            message: error.response?.data?.error || 'Failed to save email list'
-                        }
-                    }
+                mounted() {
+                    this.loadEmailLists()
+                    this.loadSavedCredentials()
                 },
-                async deleteList(name) {
-                    if (confirm(`Are you sure you want to delete the list "${name}"?`)) {
-                        try {
-                            await axios.delete(`/api/email-lists/${name}`)
-                            await this.loadEmailLists()
-                            
-                            if (this.selectedList === name) {
-                                this.selectedList = ''
+                methods: {
+                    addLog(message, type = 'info') {
+                        this.logs.push({ message, type, timestamp: new Date() });
+                        // Auto-scroll to bottom of log container
+                        this.$nextTick(() => {
+                            const container = document.querySelector('.log-container');
+                            if (container) {
+                                container.scrollTop = container.scrollHeight;
                             }
-                            
+                        });
+                    },
+                    async loadEmailLists() {
+                        try {
+                            const response = await axios.get('/api/email-lists')
+                            this.emailLists = response.data
+                        } catch (error) {
+                            console.error('Error loading email lists:', error)
+                        }
+                    },
+                    loadSavedCredentials() {
+                        try {
+                            const savedCredentials = localStorage.getItem('decima_credentials')
+                            if (savedCredentials) {
+                                const { gmail, appPassword } = JSON.parse(savedCredentials)
+                                this.gmail = gmail || ''
+                                this.appPassword = appPassword || ''
+                                this.saveCredentials = true
+                            }
+                        } catch (error) {
+                            console.error('Error loading saved credentials:', error)
+                        }
+                    },
+                    saveCredentialsToStorage() {
+                        if (this.saveCredentials) {
+                            try {
+                                const credentials = {
+                                    gmail: this.gmail,
+                                    appPassword: this.appPassword
+                                }
+                                localStorage.setItem('decima_credentials', JSON.stringify(credentials))
+                            } catch (error) {
+                                console.error('Error saving credentials:', error)
+                            }
+                        } else {
+                            localStorage.removeItem('decima_credentials')
+                        }
+                    },
+                    async saveEmailList() {
+                        try {
+                            const emails = this.newListEmails.split('\n')
+                                .map(email => email.trim())
+                                .filter(email => email)
+
+                            await axios.post('/api/email-lists', {
+                                name: this.newListName,
+                                emails: emails
+                            })
+
+                            await this.loadEmailLists()
+                            this.newListName = ''
+                            this.newListEmails = ''
                             this.status = {
                                 type: 'success',
-                                message: 'Email list deleted successfully!'
+                                message: 'Email list saved successfully'
                             }
                         } catch (error) {
                             this.status = {
                                 type: 'error',
-                                message: error.response?.data?.error || 'Failed to delete email list'
+                                message: error.response?.data?.error || 'Failed to save email list'
                             }
                         }
-                    }
-                },
-                editList(name) {
-                    this.newListName = name
-                    this.newListEmails = this.emailLists[name].join('\n')
-                },
-                async sendEmails() {
-                    this.loading = true
-                    this.status = null
-
-                    try {
-                        const formData = new FormData()
-                        formData.append('gmail', this.gmail)
-                        formData.append('app_password', this.appPassword)
-                        formData.append('emails', this.emails)
-                        formData.append('selectedList', this.selectedList)
-                        formData.append('subject', this.subject)
-                        formData.append('message', this.message)
-                        formData.append('file', this.$refs.fileInput.files[0])
-
-                        const response = await axios.post('/send_emails', formData)
-                        this.status = {
-                            type: 'success',
-                            message: response.data.message
+                    },
+                    async deleteEmailList(name) {
+                        if (confirm(`Are you sure you want to delete the list "${name}"?`)) {
+                            try {
+                                await axios.delete(`/api/email-lists/${name}`)
+                                await this.loadEmailLists()
+                                
+                                this.status = {
+                                    type: 'success',
+                                    message: 'Email list deleted successfully'
+                                }
+                            } catch (error) {
+                                this.status = {
+                                    type: 'error',
+                                    message: error.response?.data?.error || 'Failed to delete email list'
+                                }
+                            }
                         }
+                    },
+                    async sendEmails() {
+                        this.sending = true
+                        this.status = null
+                        this.logs = [] // Clear previous logs
 
-                        // Clear form on success
-                        this.subject = ''
-                        this.message = ''
-                        this.$refs.fileInput.value = ''
-                    } catch (error) {
-                        this.status = {
-                            type: 'error',
-                            message: error.response?.data?.error || 'An error occurred while sending emails'
+                        try {
+                            // Save credentials if checkbox is checked
+                            this.saveCredentialsToStorage()
+                            
+                            this.addLog('Starting email send process...')
+                            this.addLog(`Preparing to send from: ${this.gmail}`)
+
+                            const formData = new FormData()
+                            formData.append('gmail', this.gmail)
+                            formData.append('app_password', this.appPassword)
+                            
+                            // Add emails based on selection
+                            if (this.selectedList) {
+                                this.addLog(`Using email list: ${this.selectedList}`)
+                                formData.append('selectedList', this.selectedList)
+                            } else if (this.emails.trim()) {
+                                const emailCount = this.emails.trim().split('\n').length
+                                this.addLog(`Using ${emailCount} directly entered email(s)`)
+                                formData.append('emails', this.emails)
+                            }
+
+                            formData.append('subject', this.subject)
+                            formData.append('message', this.message)
+
+                            // Handle file attachments
+                            const fileInput = this.$refs.fileInput
+                            if (fileInput && fileInput.files.length > 0) {
+                                this.addLog(`Attaching ${fileInput.files.length} file(s)`)
+                                for (let file of fileInput.files) {
+                                    formData.append('files[]', file)
+                                    this.addLog(`Added attachment: ${file.name}`, 'info')
+                                }
+                            }
+
+                            this.addLog('Sending emails...')
+                            const response = await axios.post('/send_emails', formData)
+
+                            if (response.data.warning) {
+                                this.status = {
+                                    type: 'warning',
+                                    message: response.data.warning,
+                                    details: response.data.failed_recipients.map(f => `Failed to send to ${f.email}: ${f.error}`)
+                                }
+                                this.addLog('Some emails failed to send', 'error')
+                                response.data.failed_recipients.forEach(f => {
+                                    this.addLog(`Failed to send to ${f.email}: ${f.error}`, 'error')
+                                })
+                            } else {
+                                this.status = {
+                                    type: 'success',
+                                    message: response.data.message
+                                }
+                                this.addLog('All emails sent successfully!', 'success')
+                            }
+                        } catch (error) {
+                            this.status = {
+                                type: 'error',
+                                message: error.response?.data?.error || 'Failed to send emails',
+                                details: error.response?.data?.failed_recipients?.map(f => `Failed to send to ${f.email}: ${f.error}`)
+                            }
+                            this.addLog('Error occurred while sending emails', 'error')
+                            this.addLog(error.response?.data?.error || 'Failed to send emails', 'error')
+                        } finally {
+                            this.sending = false
                         }
-                    } finally {
-                        this.loading = false
                     }
                 }
-            }
-        }).mount('#app')
-    </script>
-</body>
+            }).mount('#app')
+        </script>
+    </body>
 </html>

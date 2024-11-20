@@ -6,10 +6,13 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
+from email.mime.base import MIMEBase
+from email import encoders
 import logging
 import webbrowser
 from threading import Timer
 import json
+import copy
 
 # Configure logging to output to console
 logging.basicConfig(
@@ -117,122 +120,108 @@ def delete_email_list(name):
         logger.error(f"Error deleting email list: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/send_emails', methods=['POST'])
+@app.route('/api/send-emails', methods=['POST'])
 def send_emails():
+    """Send emails to the selected list"""
     try:
-        # Log all form data for debugging
-        logger.info("Form data received:")
-        for key, value in request.form.items():
-            logger.info(f"{key}: {value}")
+        data = request.get_json()
+        gmail = data.get('gmail')
+        app_password = data.get('appPassword')
+        list_name = data.get('listName')
+        subject = data.get('subject')
+        message = data.get('message')
         
-        # Log files data
-        logger.info("Files received:")
-        for key, file in request.files.items():
-            logger.info(f"{key}: {file.filename}")
-
-        # Get Gmail credentials from the form
-        smtp_username = request.form.get('gmail')
-        smtp_password = request.form.get('app_password')
-        
-        if not smtp_username or not smtp_password:
-            return jsonify({'error': 'Gmail credentials are required'}), 400
-
-        # Validate email format
-        if '@' not in smtp_username:
-            return jsonify({'error': 'Invalid Gmail address format'}), 400
-
-        # Get and validate other form data
-        emails_input = request.form.get('emails')
-        selected_list = request.form.get('selectedList')
-        
-        # Get emails from either direct input or selected list
-        if selected_list:
-            lists = load_email_lists()
-            emails = lists.get(selected_list, [])
-            if not emails:
-                return jsonify({'error': f'Selected list "{selected_list}" is empty or not found'}), 400
-        else:
-            if not emails_input:
-                return jsonify({'error': 'Recipient emails are required'}), 400
-            emails = [email.strip() for email in emails_input.split(',') if email.strip()]
-        
+        if not all([gmail, app_password, list_name, subject, message]):
+            return jsonify({
+                'error': 'Missing required fields',
+                'status': 'error'
+            }), 400
+            
+        # Load email lists
+        lists = load_email_lists()
+        if list_name not in lists:
+            return jsonify({
+                'error': f'Email list "{list_name}" not found',
+                'status': 'error'
+            }), 404
+            
+        emails = lists[list_name]
         if not emails:
-            return jsonify({'error': 'No valid recipient emails provided'}), 400
+            return jsonify({
+                'error': 'Email list is empty',
+                'status': 'error'
+            }), 400
 
-        subject = request.form.get('subject', '')
-        message = request.form.get('message', '')
-        
-        # Check for file
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file uploaded'}), 400
-            
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-            
-        # Save file with secure filename
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        logger.info(f"File saved as: {filepath}")
-        
-        # Gmail SMTP settings
-        smtp_server = 'smtp.gmail.com'
-        smtp_port = 587
-        
-        # Create and send email
+        # Connect to SMTP server
+        try:
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(gmail, app_password)
+        except Exception as e:
+            logger.error(f"SMTP connection error: {str(e)}")
+            return jsonify({
+                'error': 'Failed to connect to SMTP server. Please check your credentials.',
+                'status': 'error'
+            }), 500
+
+        failed_recipients = []
+        successful_count = 0
+
+        # Send emails
         for email in emails:
             try:
-                # Create message
                 msg = MIMEMultipart()
-                msg['From'] = smtp_username
+                msg['From'] = gmail
                 msg['To'] = email
                 msg['Subject'] = subject
-                
-                # Add message body
+
                 msg.attach(MIMEText(message, 'plain'))
                 
-                # Add attachment
-                if os.path.exists(filepath):
-                    with open(filepath, 'rb') as f:
-                        part = MIMEApplication(f.read(), _subtype=os.path.splitext(filename)[1][1:])
-                        part.add_header('Content-Disposition', 'attachment', filename=filename)
-                        msg.attach(part)
-                else:
-                    logger.error(f"File not found: {filepath}")
-                    return jsonify({'error': 'File upload failed'}), 500
+                server.send_message(msg)
+                successful_count += 1
                 
-                # Send email
-                with smtplib.SMTP(smtp_server, smtp_port) as server:
-                    server.starttls()
-                    server.login(smtp_username, smtp_password)
-                    server.send_message(msg)
-                    logger.info(f"Email sent to: {email}")
-            
-            except smtplib.SMTPAuthenticationError as e:
-                logger.error(f"SMTP Authentication Error: {str(e)}")
-                return jsonify({'error': 'Gmail authentication failed. Please check your email and app password.'}), 401
+                # Return progress update
+                response = jsonify({
+                    'status': 'progress',
+                    'message': f'Sent email to {email}',
+                    'progress': {
+                        'current': successful_count,
+                        'total': len(emails),
+                        'success': successful_count,
+                        'failed': len(failed_recipients)
+                    }
+                })
+                response.headers['X-Progress'] = 'true'
+                yield response
+                
             except Exception as e:
-                logger.error(f"Error sending to {email}: {str(e)}")
-                return jsonify({'error': f"Failed to send email to {email}: {str(e)}"}), 500
-        
-        # Clean up
-        try:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-                logger.info("Temporary file removed")
-        except Exception as e:
-            logger.error(f"Error removing temporary file: {str(e)}")
-        
-        return jsonify({'message': 'Emails sent successfully!'})
-        
+                logger.error(f"Failed to send to {email}: {str(e)}")
+                failed_recipients.append({
+                    'email': email,
+                    'error': str(e)
+                })
+
+        server.quit()
+
+        # Final response
+        return jsonify({
+            'message': f'Sent {successful_count} emails successfully',
+            'failed_recipients': failed_recipients,
+            'status': 'success' if not failed_recipients else 'partial',
+            'progress': {
+                'current': len(emails),
+                'total': len(emails),
+                'success': successful_count,
+                'failed': len(failed_recipients)
+            }
+        })
+
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        # Log the full error traceback
-        import traceback
-        logger.error(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error in send_emails: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
 
 if __name__ == '__main__':
     # Open browser after server starts
