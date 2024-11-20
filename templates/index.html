@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decima Sender - Email File Sender</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold text-center mb-8">Decima Sender</h1>
+        
+        <div class="mb-8">
+            <h2 class="text-lg font-semibold mb-4">Gmail Configuration</h2>
+            <div class="space-y-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                    <label for="gmail" class="block text-sm font-medium text-gray-700">Gmail Address</label>
+                    <div class="mt-1">
+                        <input type="email" id="gmail" name="gmail" required
+                            class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+                <div>
+                    <label for="app_password" class="block text-sm font-medium text-gray-700">App Password</label>
+                    <div class="mt-1">
+                        <input type="password" id="app_password" name="app_password" required
+                            class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">
+                        <a href="https://myaccount.google.com/apppasswords" target="_blank" class="text-indigo-600 hover:text-indigo-500">
+                            Generate an App Password
+                        </a>
+                        (requires 2-Step Verification)
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <form id="emailForm" class="space-y-6">
+            <div>
+                <label for="emails" class="block text-sm font-medium text-gray-700">Email Addresses</label>
+                <div class="mt-1">
+                    <input type="text" id="emails" name="emails" required
+                        class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Enter email addresses separated by commas">
+                </div>
+            </div>
+
+            <div>
+                <label for="subject" class="block text-sm font-medium text-gray-700">Subject</label>
+                <div class="mt-1">
+                    <input type="text" id="subject" name="subject" required
+                        class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div>
+                <label for="message" class="block text-sm font-medium text-gray-700">Message</label>
+                <div class="mt-1">
+                    <textarea id="message" name="message" rows="4" required
+                        class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                </div>
+            </div>
+
+            <div>
+                <label for="file" class="block text-sm font-medium text-gray-700">Attachment</label>
+                <div class="mt-1">
+                    <input type="file" id="file" name="file" required
+                        class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-700">
+                </div>
+            </div>
+
+            <div>
+                <button type="submit"
+                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Send Emails
+                </button>
+            </div>
+        </form>
+
+        <div id="status" class="mt-4 text-center hidden">
+            <p id="statusMessage" class="text-sm"></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const status = document.getElementById('status');
+            const statusMessage = document.getElementById('statusMessage');
+            status.className = 'mt-4 text-center';
+            statusMessage.textContent = 'Sending emails...';
+            
+            const formData = new FormData();
+            
+            // Add form fields to FormData
+            formData.append('gmail', document.getElementById('gmail').value);
+            formData.append('app_password', document.getElementById('app_password').value);
+            formData.append('emails', document.getElementById('emails').value);
+            formData.append('subject', document.getElementById('subject').value);
+            formData.append('message', document.getElementById('message').value);
+            
+            // Add file
+            const fileInput = document.getElementById('file');
+            if (fileInput.files.length > 0) {
+                formData.append('file', fileInput.files[0]);
+            }
+            
+            try {
+                const response = await fetch('/send_emails', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                status.className = 'mt-4 text-center';
+                
+                if (response.ok) {
+                    statusMessage.className = 'text-sm text-green-600';
+                    statusMessage.textContent = data.message;
+                    e.target.reset();
+                } else {
+                    statusMessage.className = 'text-sm text-red-600';
+                    statusMessage.textContent = data.error || 'An error occurred';
+                }
+            } catch (error) {
+                status.className = 'mt-4 text-center';
+                statusMessage.className = 'text-sm text-red-600';
+                statusMessage.textContent = 'An error occurred while sending the emails';
+                console.error('Error:', error);
+            }
+        });
+    </script>
+</body>
+</html>
