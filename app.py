@@ -31,6 +31,8 @@ def get_base_path():
         return os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__)
+app.jinja_env.variable_start_string = '{[{'
+app.jinja_env.variable_end_string = '}]}'
 base_path = get_base_path()
 app.config['UPLOAD_FOLDER'] = os.path.join(base_path, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -97,7 +99,7 @@ def create_email_list():
         logger.error(f"Error creating email list: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/email-lists/<name>', methods=['DELETE'])
+@app.route('/api/email-lists/<string:name>', methods=['DELETE'])
 def delete_email_list(name):
     """Delete an email list"""
     try:

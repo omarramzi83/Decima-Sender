@@ -7,9 +7,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <div id="app" class="container mx-auto px-4 py-8 max-w-2xl">
+    <div id="app" class="container mx-auto px-4 py-8 max-w-2xl" v-cloak>
         <div class="bg-white rounded-lg shadow-lg p-6">
             <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">Decima Sender</h1>
             
