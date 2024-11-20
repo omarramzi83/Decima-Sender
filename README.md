@@ -49,34 +49,22 @@ python app.py
 
 3. Attach your file (max 16MB)
 
-4. Click "Send Emails" to send the file to all recipients
+4. Click "Send Emails" to send your message
 
-## Security Notes
+## Building the Executable
 
-- Files are temporarily stored and immediately deleted after sending
-- Maximum file size is limited to 16MB
-- All file names are sanitized before processing
-- Gmail credentials are only used for the current session and not stored
-- Uses secure SMTP with TLS encryption
+To create a Windows executable:
 
-## Troubleshooting
-
-If you encounter any issues:
-
-1. Make sure 2-Step Verification is enabled on your Google Account
-2. Verify you're using the correct App Password
-3. Check that your Gmail address is entered correctly
-4. Ensure recipient email addresses are properly comma-separated
-5. Check the file size is under 16MB
-
-## Development
-
-The project structure is organized as follows:
+1. Run the build script:
+```bash
+python build_exe.py
 ```
-Decima Sender/
-├── app.py              # Main Flask application
-├── requirements.txt    # Python dependencies
-├── uploads/           # Temporary file storage
-└── templates/
-    └── index.html     # Frontend UI template
-```
+
+2. Find the executable in the `dist` folder
+3. Double-click `Decima-Sender.exe` to run the application
+
+## Security Note
+
+- Never share your Gmail App Password
+- The application does not store any credentials
+- All uploaded files are automatically deleted after sending
