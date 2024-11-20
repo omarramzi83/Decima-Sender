@@ -1,12 +1,15 @@
 from flask import Flask, render_template, request, jsonify
 import os
+import sys
 from werkzeug.utils import secure_filename
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 import logging
-import sys
+import webbrowser
+from threading import Timer
+import json
 
 # Configure logging to output to console
 logging.basicConfig(
@@ -18,16 +21,99 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+def get_base_path():
+    """Get the base path for the application, works both for development and PyInstaller"""
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable
+        return os.path.dirname(sys.executable)
+    else:
+        # Running as script
+        return os.path.dirname(os.path.abspath(__file__))
 
-# Ensure upload folder exists
+app = Flask(__name__)
+base_path = get_base_path()
+app.config['UPLOAD_FOLDER'] = os.path.join(base_path, 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['EMAIL_LISTS_FILE'] = os.path.join(base_path, 'email_lists.json')
+
+# Ensure required folders exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+def load_email_lists():
+    """Load email lists from JSON file"""
+    try:
+        if os.path.exists(app.config['EMAIL_LISTS_FILE']):
+            with open(app.config['EMAIL_LISTS_FILE'], 'r') as f:
+                return json.load(f)
+        return {}
+    except Exception as e:
+        logger.error(f"Error loading email lists: {str(e)}")
+        return {}
+
+def save_email_lists(lists):
+    """Save email lists to JSON file"""
+    try:
+        with open(app.config['EMAIL_LISTS_FILE'], 'w') as f:
+            json.dump(lists, f, indent=2)
+        return True
+    except Exception as e:
+        logger.error(f"Error saving email lists: {str(e)}")
+        return False
+
+def open_browser():
+    """Open the browser after the server starts"""
+    webbrowser.open('http://127.0.0.1:5000/')
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/api/email-lists', methods=['GET'])
+def get_email_lists():
+    """Get all email lists"""
+    lists = load_email_lists()
+    return jsonify(lists)
+
+@app.route('/api/email-lists', methods=['POST'])
+def create_email_list():
+    """Create or update an email list"""
+    try:
+        data = request.get_json()
+        list_name = data.get('name')
+        emails = data.get('emails', [])
+        
+        if not list_name:
+            return jsonify({'error': 'List name is required'}), 400
+            
+        lists = load_email_lists()
+        lists[list_name] = emails
+        
+        if save_email_lists(lists):
+            return jsonify({'message': f'Email list "{list_name}" saved successfully'})
+        else:
+            return jsonify({'error': 'Failed to save email list'}), 500
+            
+    except Exception as e:
+        logger.error(f"Error creating email list: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/email-lists/<name>', methods=['DELETE'])
+def delete_email_list(name):
+    """Delete an email list"""
+    try:
+        lists = load_email_lists()
+        if name in lists:
+            del lists[name]
+            if save_email_lists(lists):
+                return jsonify({'message': f'Email list "{name}" deleted successfully'})
+            else:
+                return jsonify({'error': 'Failed to save changes'}), 500
+        else:
+            return jsonify({'error': 'List not found'}), 404
+            
+    except Exception as e:
+        logger.error(f"Error deleting email list: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/send_emails', methods=['POST'])
 def send_emails():
@@ -54,11 +140,19 @@ def send_emails():
             return jsonify({'error': 'Invalid Gmail address format'}), 400
 
         # Get and validate other form data
-        if not request.form.get('emails'):
-            return jsonify({'error': 'Recipient emails are required'}), 400
-            
-        emails = request.form.get('emails').split(',')
-        emails = [email.strip() for email in emails if email.strip()]
+        emails_input = request.form.get('emails')
+        selected_list = request.form.get('selectedList')
+        
+        # Get emails from either direct input or selected list
+        if selected_list:
+            lists = load_email_lists()
+            emails = lists.get(selected_list, [])
+            if not emails:
+                return jsonify({'error': f'Selected list "{selected_list}" is empty or not found'}), 400
+        else:
+            if not emails_input:
+                return jsonify({'error': 'Recipient emails are required'}), 400
+            emails = [email.strip() for email in emails_input.split(',') if email.strip()]
         
         if not emails:
             return jsonify({'error': 'No valid recipient emails provided'}), 400
@@ -139,4 +233,7 @@ def send_emails():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Open browser after server starts
+    Timer(1.5, open_browser).start()
+    # Run the server
+    app.run(debug=False)

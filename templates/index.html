@@ -3,134 +3,257 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Decima Sender - Email File Sender</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <title>Decima Sender</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
-        <h1 class="text-2xl font-bold text-center mb-8">Decima Sender</h1>
-        
-        <div class="mb-8">
-            <h2 class="text-lg font-semibold mb-4">Gmail Configuration</h2>
-            <div class="space-y-4 p-4 bg-gray-50 rounded-lg">
-                <div>
-                    <label for="gmail" class="block text-sm font-medium text-gray-700">Gmail Address</label>
-                    <div class="mt-1">
-                        <input type="email" id="gmail" name="gmail" required
-                            class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+<body class="bg-gray-100 min-h-screen">
+    <div id="app" class="container mx-auto px-4 py-8 max-w-2xl">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">Decima Sender</h1>
+            
+            <!-- Email List Management -->
+            <div class="mb-8 p-4 bg-gray-50 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Email Lists</h2>
+                
+                <!-- Create/Edit List Form -->
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">List Name</label>
+                        <input type="text" v-model="newListName" placeholder="Enter list name"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Emails (one per line)</label>
+                        <textarea v-model="newListEmails" rows="3" placeholder="Enter emails, one per line"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                    </div>
+                    <button @click="saveEmailList" :disabled="!newListName"
+                        class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50">
+                        Save List
+                    </button>
+                </div>
+
+                <!-- Existing Lists -->
+                <div v-if="Object.keys(emailLists).length > 0" class="space-y-4">
+                    <h3 class="text-lg font-medium">Your Lists</h3>
+                    <div v-for="(emails, name) in emailLists" :key="name" 
+                        class="p-3 bg-white rounded border border-gray-200 flex justify-between items-center">
+                        <div>
+                            <span class="font-medium">{{ name }}</span>
+                            <span class="text-gray-500 text-sm ml-2">({{ emails.length }} emails)</span>
+                        </div>
+                        <div class="space-x-2">
+                            <button @click="editList(name)" 
+                                class="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded">
+                                Edit
+                            </button>
+                            <button @click="deleteList(name)"
+                                class="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded">
+                                Delete
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div>
-                    <label for="app_password" class="block text-sm font-medium text-gray-700">App Password</label>
-                    <div class="mt-1">
-                        <input type="password" id="app_password" name="app_password" required
-                            class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+
+            <!-- Email Form -->
+            <form @submit.prevent="sendEmails" class="space-y-6">
+                <!-- Gmail Credentials -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Gmail Address</label>
+                        <input type="email" v-model="gmail" required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                     </div>
-                    <p class="mt-1 text-xs text-gray-500">
-                        <a href="https://myaccount.google.com/apppasswords" target="_blank" class="text-indigo-600 hover:text-indigo-500">
-                            Generate an App Password
-                        </a>
-                        (requires 2-Step Verification)
-                    </p>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">App Password</label>
+                        <input type="password" v-model="appPassword" required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <form id="emailForm" class="space-y-6">
-            <div>
-                <label for="emails" class="block text-sm font-medium text-gray-700">Email Addresses</label>
-                <div class="mt-1">
-                    <input type="text" id="emails" name="emails" required
-                        class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="Enter email addresses separated by commas">
+                <!-- Recipients -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Select Email List (Optional)</label>
+                        <select v-model="selectedList"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">Enter emails manually</option>
+                            <option v-for="(emails, name) in emailLists" :key="name" :value="name">
+                                {{ name }} ({{ emails.length }} emails)
+                            </option>
+                        </select>
+                    </div>
+                    <div v-if="!selectedList">
+                        <label class="block text-sm font-medium text-gray-700">Recipients (comma-separated)</label>
+                        <input type="text" v-model="emails" :required="!selectedList"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
                 </div>
-            </div>
 
-            <div>
-                <label for="subject" class="block text-sm font-medium text-gray-700">Subject</label>
-                <div class="mt-1">
-                    <input type="text" id="subject" name="subject" required
-                        class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <!-- Subject -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Subject</label>
+                    <input type="text" v-model="subject" required
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                 </div>
-            </div>
 
-            <div>
-                <label for="message" class="block text-sm font-medium text-gray-700">Message</label>
-                <div class="mt-1">
-                    <textarea id="message" name="message" rows="4" required
-                        class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                <!-- Message -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Message</label>
+                    <textarea v-model="message" rows="4" required
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
                 </div>
-            </div>
 
-            <div>
-                <label for="file" class="block text-sm font-medium text-gray-700">Attachment</label>
-                <div class="mt-1">
-                    <input type="file" id="file" name="file" required
-                        class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-700">
+                <!-- File Upload -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Attachment</label>
+                    <input type="file" ref="fileInput" required
+                        class="mt-1 block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-md file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-blue-50 file:text-blue-700
+                        hover:file:bg-blue-100">
                 </div>
-            </div>
 
-            <div>
-                <button type="submit"
-                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Send Emails
+                <!-- Submit Button -->
+                <button type="submit" :disabled="loading"
+                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
+                    {{ loading ? 'Sending...' : 'Send Emails' }}
                 </button>
-            </div>
-        </form>
+            </form>
 
-        <div id="status" class="mt-4 text-center hidden">
-            <p id="statusMessage" class="text-sm"></p>
+            <!-- Status Messages -->
+            <div v-if="status" :class="['mt-4 p-4 rounded-md', 
+                status.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700']">
+                {{ status.message }}
+            </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('emailForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const status = document.getElementById('status');
-            const statusMessage = document.getElementById('statusMessage');
-            status.className = 'mt-4 text-center';
-            statusMessage.textContent = 'Sending emails...';
-            
-            const formData = new FormData();
-            
-            // Add form fields to FormData
-            formData.append('gmail', document.getElementById('gmail').value);
-            formData.append('app_password', document.getElementById('app_password').value);
-            formData.append('emails', document.getElementById('emails').value);
-            formData.append('subject', document.getElementById('subject').value);
-            formData.append('message', document.getElementById('message').value);
-            
-            // Add file
-            const fileInput = document.getElementById('file');
-            if (fileInput.files.length > 0) {
-                formData.append('file', fileInput.files[0]);
-            }
-            
-            try {
-                const response = await fetch('/send_emails', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                status.className = 'mt-4 text-center';
-                
-                if (response.ok) {
-                    statusMessage.className = 'text-sm text-green-600';
-                    statusMessage.textContent = data.message;
-                    e.target.reset();
-                } else {
-                    statusMessage.className = 'text-sm text-red-600';
-                    statusMessage.textContent = data.error || 'An error occurred';
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    gmail: '',
+                    appPassword: '',
+                    emails: '',
+                    subject: '',
+                    message: '',
+                    loading: false,
+                    status: null,
+                    // Email list management
+                    emailLists: {},
+                    newListName: '',
+                    newListEmails: '',
+                    selectedList: ''
                 }
-            } catch (error) {
-                status.className = 'mt-4 text-center';
-                statusMessage.className = 'text-sm text-red-600';
-                statusMessage.textContent = 'An error occurred while sending the emails';
-                console.error('Error:', error);
+            },
+            mounted() {
+                this.loadEmailLists()
+            },
+            methods: {
+                async loadEmailLists() {
+                    try {
+                        const response = await axios.get('/api/email-lists')
+                        this.emailLists = response.data
+                    } catch (error) {
+                        console.error('Error loading email lists:', error)
+                    }
+                },
+                async saveEmailList() {
+                    try {
+                        const emails = this.newListEmails.split('\n')
+                            .map(email => email.trim())
+                            .filter(email => email)
+                        
+                        await axios.post('/api/email-lists', {
+                            name: this.newListName,
+                            emails: emails
+                        })
+                        
+                        // Reset form and reload lists
+                        this.newListName = ''
+                        this.newListEmails = ''
+                        await this.loadEmailLists()
+                        
+                        this.status = {
+                            type: 'success',
+                            message: 'Email list saved successfully!'
+                        }
+                    } catch (error) {
+                        this.status = {
+                            type: 'error',
+                            message: error.response?.data?.error || 'Failed to save email list'
+                        }
+                    }
+                },
+                async deleteList(name) {
+                    if (confirm(`Are you sure you want to delete the list "${name}"?`)) {
+                        try {
+                            await axios.delete(`/api/email-lists/${name}`)
+                            await this.loadEmailLists()
+                            
+                            if (this.selectedList === name) {
+                                this.selectedList = ''
+                            }
+                            
+                            this.status = {
+                                type: 'success',
+                                message: 'Email list deleted successfully!'
+                            }
+                        } catch (error) {
+                            this.status = {
+                                type: 'error',
+                                message: error.response?.data?.error || 'Failed to delete email list'
+                            }
+                        }
+                    }
+                },
+                editList(name) {
+                    this.newListName = name
+                    this.newListEmails = this.emailLists[name].join('\n')
+                },
+                async sendEmails() {
+                    this.loading = true
+                    this.status = null
+
+                    try {
+                        const formData = new FormData()
+                        formData.append('gmail', this.gmail)
+                        formData.append('app_password', this.appPassword)
+                        formData.append('emails', this.emails)
+                        formData.append('selectedList', this.selectedList)
+                        formData.append('subject', this.subject)
+                        formData.append('message', this.message)
+                        formData.append('file', this.$refs.fileInput.files[0])
+
+                        const response = await axios.post('/send_emails', formData)
+                        this.status = {
+                            type: 'success',
+                            message: response.data.message
+                        }
+
+                        // Clear form on success
+                        this.subject = ''
+                        this.message = ''
+                        this.$refs.fileInput.value = ''
+                    } catch (error) {
+                        this.status = {
+                            type: 'error',
+                            message: error.response?.data?.error || 'An error occurred while sending emails'
+                        }
+                    } finally {
+                        this.loading = false
+                    }
+                }
             }
-        });
+        }).mount('#app')
     </script>
 </body>
 </html>
